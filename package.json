@@ -1,0 +1,29 @@
+{
+  "name": "expo_backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "nodemon --exec babel-node -- server.js"
+  },
+  "author": "Brandon Karl, Serey Morm, Mayur Khatri",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.194.0",
+    "bcrypt": "^1.0.3",
+    "body-parser": "^1.18.2",
+    "cors": "^2.8.4",
+    "dotenv": "^5.0.0",
+    "express": "^4.16.2",
+    "jsonwebtoken": "^8.1.1",
+    "moment": "^2.20.1",
+    "multer": "^1.3.0",
+    "pg": "^7.4.1"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-plugin-transform-object-rest-spread": "^6.26.0",
+    "babel-preset-env": "^1.6.1",
+    "nodemon": "^1.14.12"
+  }
+}
