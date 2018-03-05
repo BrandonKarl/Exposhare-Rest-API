@@ -21,18 +21,36 @@ router.get('/:id', async (req, res) => {
     return res.status(404).json({ error: 'User not found' })
   }
 
-  const feed = await db.query(
-    'SELECT posts.id, posts.content, users.firstname, users.lastname, count(likes) AS likes, posts.created_at, posts.image_url ' +
+  let feed = await db.query(
+    'SELECT users.firstname, users.lastname, users.email, users.created_at AS user_created_at, users.id AS user_id, ' + 
+    'count(likes) AS likes, posts.created_at, posts.image_url, posts.id, posts.content ' +
     'FROM follows ' + 
     'JOIN posts ON posts.user_id = followee ' + 
     'JOIN users ON users.id = posts.user_id ' +
     'LEFT JOIN likes ON likes.post_id = posts.id ' + 
     'WHERE follower = $1 ' +
-    'GROUP BY posts.id, users.firstname, users.lastname',
+    'GROUP BY posts.id, users.firstname, users.lastname, users.email, users.created_at, users.id',
     [id]
   )
 
-  return res.json({ ...user.rows[0], feed: feed.rows })
+  feed = feed.rows.map(post => {
+    return {
+      id: post.id,
+      content: post.content,
+      likes: post.likes,
+      created_at: post.created_at,
+      image_url: post.image_url,
+      user: {
+        firstname: post.firstname,
+        lastname: post.lastname,
+        email: post.email,
+        id: post.user_id,
+        created_at: post.user_created_at
+      }
+    }
+  })
+
+  return res.json({ ...user.rows[0], feed })
 })
 
 router.post('/', async (req, res) => {
