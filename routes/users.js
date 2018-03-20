@@ -12,26 +12,31 @@ const router = express.Router()
 
 router.get('/:id', async (req, res) => {
   const { id } = req.params
-  const user = await db.query(
-    'SELECT id, firstname, lastname, email, created_at FROM users WHERE id = $1',
-    [id]
-  )
+  try {
+    var user = await db.query(
+      `SELECT id, firstname, lastname, email, created_at FROM users WHERE id = $1`,
+      [id]
+    )
+  } catch(e) {
+    return res.status(400).json({ error: 'Malformed or bad query' })
+  }
 
   if(!user.rows.length) {
     return res.status(404).json({ error: 'User not found' })
   }
 
-  let feed = await db.query(
-    'SELECT users.firstname, users.lastname, users.email, users.created_at AS user_created_at, users.id AS user_id, ' + 
-    'count(likes) AS likes, posts.created_at, posts.image_url, posts.id, posts.content ' +
-    'FROM follows ' + 
-    'JOIN posts ON posts.user_id = followee ' + 
-    'JOIN users ON users.id = posts.user_id ' +
-    'LEFT JOIN likes ON likes.post_id = posts.id ' + 
-    'WHERE follower = $1 ' +
-    'GROUP BY posts.id, users.firstname, users.lastname, users.email, users.created_at, users.id',
-    [id]
-  )
+  try {
+    var feed = await db.query(`
+    SELECT firstname, lastname, email, users.created_at AS user_created_at, users.id AS user_id,
+      posts.created_at, image_url, posts.id, content, likes 
+    FROM follows 
+    JOIN posts ON posts.user_id = followee
+    JOIN users ON users.id = posts.user_id
+    WHERE follower = $1`,
+    [id])
+  } catch(e) {
+    return res.status(500).json({ error: 'Error getting feed for user' })
+  }
 
   feed = feed.rows.map(post => {
     return {
@@ -54,10 +59,15 @@ router.get('/:id', async (req, res) => {
 })
 
 router.post('/', async (req, res) => {
-  const { firstname, lastname, email, password } = req.body
-  const foundUser = await db.query(
-    'SELECT * FROM users WHERE email = $1', [email]
-  )
+  // Check params
+  const { firstname, lastname, email, password, bio, username } = req.body
+  try {
+    var foundUser = await db.query(
+      `SELECT * FROM users WHERE email = $1`, [email]
+    )
+  } catch(e) {
+    return res.status(400).json({ error: 'Could not lookup users' })
+  }
 
   if(foundUser.rows.length) {
     return res.status(400).json({ error: 'Email in use' })
@@ -65,12 +75,16 @@ router.post('/', async (req, res) => {
 
   const hashedPass = bcrypt.hashSync(password, 10)
 
-  const newUser = await db.query(
-    'INSERT INTO users (firstname, lastname, email, password) ' +
-    'VALUES ($1, $2, $3, $4) ' + 
-    'RETURNING firstname, lastname, email, id, created_at',
-    [firstname, lastname, email, hashedPass]
-  )
+  try {
+    var newUser = await db.query(`
+    INSERT INTO users (firstname, lastname, email, password, bio, username)
+    VALUES ($1, $2, $3, $4, $5, $6) 
+    RETURNING firstname, lastname, email, id, created_at, bio, username, profile_picture`,
+    [firstname, lastname, email, hashedPass, bio, username])
+  } catch(e) {
+    return res.status(400).json({ error: 'Could not create user' })
+  }
+
 
   const token = jwt.sign({
     user: newUser.rows[0],
@@ -85,10 +99,15 @@ router.post('/', async (req, res) => {
 router.post('/authenticate', async (req, res) => {
   const { email, password } = req.body
 
-  const foundUser = await db.query(
-    'SELECT firstname, lastname, email, id, created_at, password FROM users WHERE email = $1',
-    [email]
-  )
+  try {
+    var foundUser = await db.query(`
+    SELECT firstname, lastname, email, id, created_at, password, profile_picture, bio, username 
+    FROM users
+    WHERE email = $1`,
+    [email])
+  } catch(e) {
+    res.status(400).json({ error: 'Could not lookup users' })
+  }
 
   if(!foundUser.rows.length) {
     return res.status(404).json({ error: 'User not found' })
@@ -98,11 +117,11 @@ router.post('/authenticate', async (req, res) => {
     return res.status(403).json({ error: 'Invalid Password' })
   }
 
+  delete foundUser.rows[0]['password']
+
   const token = jwt.sign({
     user: foundUser.rows[0],
   }, process.env.JWT)
-
-  delete foundUser.rows[0]['password']
 
   return res.json({
     user: foundUser.rows[0],

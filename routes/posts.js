@@ -19,25 +19,28 @@ const s3 = new aws.S3()
 router.get('/:id', async (req, res) => {
   const { id } = req.params
 
-  const foundPost = await db.query(
-    'SELECT posts.id, content, posts.user_id, created_at, image_url, count(likes) AS likes ' +
-    'FROM posts ' +
-    'LEFT JOIN likes ON likes.post_id = posts.id ' +
-    'WHERE id = $1 ' +
-    'GROUP BY posts.id, posts.user_id',
-    [id]
-  )
+  try {
+    var foundPost = await db.query(
+      'SELECT posts.id, content, posts.user_id, created_at, image_url, likes ' +
+      'FROM posts WHERE id = $1',
+      [id])
+  } catch(e) {
+    return res.status(400).json({ error: 'Malformed or bad query' })
+  }
 
   if(!foundPost.rows.length) {
     return res.status(404).json({ error: 'Post not found' })
   }
 
-  const postsUser = await db.query(
-    'SELECT id, firstname, lastname, email, created_at ' +
-    'FROM users ' +
-    'WHERE id = $1',
-    [foundPost.rows[0].user_id]
-  )
+  try {
+    var postsUser = await db.query(
+      'SELECT id, firstname, lastname, email, created_at, bio, profile_picture, username ' +
+      'FROM users ' +
+      'WHERE id = $1',
+      [foundPost.rows[0].user_id])
+  } catch(e) {
+    return res.status(400).json({ error: 'Could not lookup users' })
+  }
 
   return res.json({ ...foundPost.rows[0], user: postsUser.rows[0] })
 })
@@ -46,24 +49,36 @@ router.post('/', upload.single('photo'), async (req, res) => {
   const time = moment().format().replace(/:/g, '-')
   const { content, user_id } = req.body
 
-  await s3.putObject({
-    Body: req.file.buffer,
-    Bucket: `gui-project-database/${user_id}`,
-    Key: `${time}.png`,
-    ACL: 'public-read'
-  }).promise()
+  try {
+    await s3.putObject({
+      Body: req.file.buffer,
+      Bucket: `gui-project-database/${user_id}`,
+      Key: `${time}.png`,
+      ACL: 'public-read'
+    }).promise()
+  } catch(e) {
+    return res.status(500).json({ error: 'Unable to upload image' })
+  }
 
-  const newPost = await db.query(
-    'INSERT INTO posts (content, user_id, image_url) ' +
-    'VALUES ($1, $2, $3) ' +
-    'RETURNING id, user_id, content, image_url, created_at',
-    [content, user_id, `/${user_id}/${time}.png`]
-  )
+  try {
+    var newPost = await db.query(
+      'INSERT INTO posts (content, user_id, image_url) ' +
+      'VALUES ($1, $2, $3) ' +
+      'RETURNING id, user_id, content, image_url, created_at',
+      [content, user_id, `/${user_id}/${time}.png`]
+    )
+  } catch(e) {
+    return res.status(400).json({ error: 'Could not create post '})
+  }
 
-  const user = await db.query(
-    'SELECT id, firstname, lastname, email, created_at FROM users WHERE id = $1',
-    [newPost.rows[0].user_id]
-  )
+  try {
+    var user = await db.query(
+      'SELECT id, firstname, lastname, email, created_at FROM users WHERE id = $1',
+      [newPost.rows[0].user_id]
+    )
+  } catch(e) {
+    return res.status(400).json({ error: 'Could not lookup user' })
+  }
 
   return res.json({ ...newPost.rows[0], user: user.rows[0] })
 })

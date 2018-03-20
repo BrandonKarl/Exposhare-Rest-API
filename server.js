@@ -29,7 +29,7 @@ app.use(bodyParser.urlencoded({ extended: true }))
 app.use(bodyParser.json())
 app.use(cors())
 
-app.get('/', (req, res) => res.send('Home Route /'))
+app.get('/', (req, res) => res.send('Home Route!!! /'))
 
 app.use('/api/users', users)
 app.use('/api/posts', posts)
