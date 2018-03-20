@@ -14,7 +14,11 @@ const router = express.Router()
 
 // Setup file upload
 const upload = multer()
-const s3 = new aws.S3()
+
+const s3 = new aws.S3({
+  accessKeyId: process.env.AWS_KEY,
+  secretAccessKey: process.env.AWS_SECRET
+})
 
 router.get('/:id', async (req, res) => {
   const { id } = req.params
